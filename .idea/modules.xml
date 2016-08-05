@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/tangram/tangram.iml" filepath="$PROJECT_DIR$/tangram/tangram.iml" />
+      <module fileurl="file://$PROJECT_DIR$/tplMapsNaya.iml" filepath="$PROJECT_DIR$/tplMapsNaya.iml" />
+    </modules>
+  </component>
+</project>
