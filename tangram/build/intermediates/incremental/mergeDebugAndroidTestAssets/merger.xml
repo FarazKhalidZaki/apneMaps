@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merger version="3"><dataSet config="debug"><source path="/home/faraz/tplMapsNaya/tangram/build/intermediates/bundles/debug/assets"/></dataSet><dataSet config="main"><source path="/home/faraz/tplMapsNaya/tangram/src/androidTest/assets"/></dataSet></merger>
+<merger version="3"><dataSet config="debug"><source path="/home/faraz/tplmaps-3d-AndroidDependency/apneMaps/tangram/build/intermediates/bundles/debug/assets"/></dataSet><dataSet config="main"><source path="/home/faraz/tplmaps-3d-AndroidDependency/apneMaps/tangram/src/androidTest/assets"/></dataSet></merger>

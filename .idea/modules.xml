@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/apneMaps.iml" filepath="$PROJECT_DIR$/apneMaps.iml" />
       <module fileurl="file://$PROJECT_DIR$/tangram/tangram.iml" filepath="$PROJECT_DIR$/tangram/tangram.iml" />
       <module fileurl="file://$PROJECT_DIR$/tplMapsNaya.iml" filepath="$PROJECT_DIR$/tplMapsNaya.iml" />
     </modules>
