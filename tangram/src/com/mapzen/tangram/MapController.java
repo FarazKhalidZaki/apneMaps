@@ -3,11 +3,9 @@ package com.mapzen.tangram;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
-import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLSurfaceView.Renderer;
 import android.util.DisplayMetrics;
-import android.util.Log;
 
 import com.mapzen.tangram.TouchInput.Gestures;
 import com.squareup.okhttp.Callback;
@@ -15,7 +13,6 @@ import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
 
 import java.io.IOException;
-import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -61,7 +58,7 @@ public class MapController implements Renderer {
         TILE_INFOS,
         LABELS,
         TANGRAM_INFOS,
-        ALL_LABELS,
+        DRAW_ALL_LABELS,
         TANGRAM_STATS,
     }
 
@@ -726,6 +723,30 @@ public class MapController implements Renderer {
         nativeAddFeature(mapPointer, sourcePtr, coordinates, rings, properties);
     }
 
+    public int addMarker() {
+        checkPointer(mapPointer);
+        return nativeAddMarker(mapPointer);
+    }
+
+    public void markerSetStyle(int markerId,String stylingSting) {
+        checkPointer(mapPointer);
+        nativeMarkerSetStyling(mapPointer,markerId,stylingSting);
+    }
+
+    public void markerSetPoint(int markerId,double lng,double lat) {
+        checkPointer(mapPointer);
+        nativeMarkerSetPoint(mapPointer,markerId,lng,lat);
+    }
+    public void markerSetPointEased(int markerId,double lng,double lat,float duration, int easeType) {
+        checkPointer(mapPointer);
+        nativeMarkerSetPointEased(mapPointer,markerId,lng,lat,duration,easeType);
+    }
+    public void markerSetVisible(int markerId,boolean visible) {
+        checkPointer(mapPointer);
+        nativeMarkerSetVisible(mapPointer,markerId,visible);
+    }
+
+
     void addGeoJson(long sourcePtr, String geoJson) {
         checkPointer(mapPointer);
         checkPointer(sourcePtr);
@@ -769,6 +790,15 @@ public class MapController implements Renderer {
     private synchronized native void nativeSetPixelScale(long mapPtr, float scale);
     private synchronized native void nativeSetCameraType(long mapPtr, int type);
     private synchronized native int nativeGetCameraType(long mapPtr);
+
+    //------Marker Native Methods--------
+    private synchronized native int nativeAddMarker(long mapPtr);
+    private synchronized native void nativeMarkerSetPoint(long mapPtr,int markerId, double lon, double lat);
+    private synchronized native void nativeMarkerSetPointEased(long mapPtr,int markerId, double lon, double lat, float duration, int easeType);
+    private synchronized native void nativeMarkerSetStyling(long mapPtr,int markerId, String stylingString);
+    private synchronized native void nativeMarkerSetVisible(long mapPtr,int markerId, boolean visible);
+    private synchronized native void nativeMarkerRemove(long mapPtr,int markerId);
+
     private synchronized native void nativeHandleTapGesture(long mapPtr, float posX, float posY);
     private synchronized native void nativeHandleDoubleTapGesture(long mapPtr, float posX, float posY);
     private synchronized native void nativeHandlePanGesture(long mapPtr, float startX, float startY, float endX, float endY);
@@ -903,79 +933,5 @@ public class MapController implements Renderer {
 
         return fontFileParser.getFontFallback(importance, weightHint);
     }
-
-    /*public static final String URL_IDENTFR_COMPOSITE = "composite/";
-    public static final String URL_IDENTFR_MAPBOX_SATELLITE = "mapbox.satellite/";
-
-    private RequestType getRequestType(String shortUrl) {
-        if(shortUrl.contains(URL_IDENTFR_MAPBOX_SATELLITE))
-            return RequestType.MAP_SATELLITE;
-
-        if (shortUrl.contains(URL_IDENTFR_COMPOSITE))
-            return RequestType.MAP_COMPOSITE;
-        else if (shortUrl.contains(URL_IDENTFR_BUILDINGS))
-            return RequestType.MAP_BUILDINGS;
-        else if (shortUrl.contains(URL_IDENTFR_POIS))
-            return RequestType.MAP_POIS;
-        else
-            return RequestType.NONE;
-    }
-
-    private static final int MAP_BUILDINGS_MIN_ZOOM = 14;
-    private static final int MAP_BUILDINGS_MAX_ZOOM = 18;
-    private static final int MAP_POIS_MIN_ZOOM = 10;
-    private static final int MAP_POIS_MAX_ZOOM = 19;
-
-    *//**
-     * Method returns that client should request against the url or not.
-     * Reason is to reduce request load on server by seeking the requestType and its limitations
-     * based on zoom levels.
-     *//*
-    private boolean shouldRequestToServer(RequestType requestType, String shortUrl) {
-        if(requestType == RequestType.MAP_SATELLITE || requestType == RequestType.MAP_COMPOSITE)
-            return true;
-
-        int zoom = getZoomLevelForRequest(requestType, shortUrl);
-        return (requestType == RequestType.MAP_BUILDINGS && zoom >= MAP_BUILDINGS_MIN_ZOOM
-                && zoom <= MAP_BUILDINGS_MAX_ZOOM)  // For Buildings
-                || (requestType == RequestType.MAP_POIS && zoom >= MAP_POIS_MIN_ZOOM
-                && zoom <= MAP_POIS_MAX_ZOOM); //For POIs
-    }
-
-    public static final String URL_IDENTFR_BUILDINGS = "buildings/";
-    public static final String URL_IDENTFR_POIS = "pois/";
-
-    private int getZoomLevelForRequest(RequestType requestType, String shortUrl) {
-        int intZoom = -1;
-
-        if (requestType == RequestType.NONE || requestType == RequestType.MAP_SATELLITE
-                || requestType == RequestType.MAP_COMPOSITE) {
-            return intZoom;
-        }
-
-        String strIdentifier = null;
-        if (requestType == RequestType.MAP_BUILDINGS)
-            strIdentifier = URL_IDENTFR_BUILDINGS;
-        else if (requestType == RequestType.MAP_POIS)
-            strIdentifier = URL_IDENTFR_POIS;
-
-        if (strIdentifier != null) {
-            int lastIndex = shortUrl.lastIndexOf(strIdentifier) + strIdentifier.length();
-            String strZoom = shortUrl.substring(lastIndex, lastIndex + 2);
-
-            if(strZoom.contains("/")) {
-                intZoom = Integer.valueOf(strZoom.replace("/", ""));
-                return intZoom;
-            } else {
-                return Integer.valueOf(strZoom);
-            }
-        } else {
-            return intZoom;
-        }
-    }
-
-    public enum RequestType {
-        NONE, MAP_COMPOSITE, MAP_BUILDINGS, MAP_POIS, MAP_SATELLITE
-    }*/
 
 }
