@@ -3,6 +3,7 @@ package com.mapzen.tangram;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
+import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLSurfaceView.Renderer;
 import android.util.DisplayMetrics;
@@ -13,6 +14,7 @@ import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
 
 import java.io.IOException;
+import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -60,6 +62,7 @@ public class MapController implements Renderer {
         TANGRAM_INFOS,
         DRAW_ALL_LABELS,
         TANGRAM_STATS,
+        SELECTION_BUFFER,
     }
 
     /**
@@ -752,6 +755,14 @@ public class MapController implements Renderer {
         checkPointer(sourcePtr);
         nativeAddGeoJson(mapPointer, sourcePtr, geoJson);
     }
+    void addStyleUpdate(String styleName,String styleParam,float paramValue){
+        checkPointer(mapPointer);
+        nativeAddStyleUpdate(mapPointer,styleName,styleParam,paramValue);
+    }
+    void  applyStyleUpdate(){
+        checkPointer(mapPointer);
+        nativeApplyStyleUpdate(mapPointer);
+    }
 
     void checkPointer(long ptr) {
         if (ptr <= 0) {
@@ -798,6 +809,10 @@ public class MapController implements Renderer {
     private synchronized native void nativeMarkerSetStyling(long mapPtr,int markerId, String stylingString);
     private synchronized native void nativeMarkerSetVisible(long mapPtr,int markerId, boolean visible);
     private synchronized native void nativeMarkerRemove(long mapPtr,int markerId);
+
+    //---------Style Updates Methods------
+    private synchronized native void nativeAddStyleUpdate(long mapPtr, String styleName, String styleParam, float paramValue);
+    private synchronized native void nativeApplyStyleUpdate(long mapPtr);
 
     private synchronized native void nativeHandleTapGesture(long mapPtr, float posX, float posY);
     private synchronized native void nativeHandleDoubleTapGesture(long mapPtr, float posX, float posY);
@@ -895,12 +910,6 @@ public class MapController implements Renderer {
         if (httpHandler == null) {
             return false;
         }
-
-        // Dont send request if it does not meet criteria
-        if (!TPLHttpRequestManager.shouldRequestToServer(url)) {
-            return false;
-        }
-
         httpHandler.onRequest(url, new Callback() {
             @Override
             public void onFailure(Request request, IOException e) {
