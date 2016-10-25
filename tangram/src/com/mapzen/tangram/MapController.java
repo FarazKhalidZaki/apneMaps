@@ -755,11 +755,11 @@ public class MapController implements Renderer {
         checkPointer(sourcePtr);
         nativeAddGeoJson(mapPointer, sourcePtr, geoJson);
     }
-    void addStyleUpdate(String styleName,String styleParam,float paramValue){
+    public void addStyleUpdate(String styleName,String styleParam,float paramValue){
         checkPointer(mapPointer);
         nativeAddStyleUpdate(mapPointer,styleName,styleParam,paramValue);
     }
-    void  applyStyleUpdate(){
+    public void  applyStyleUpdate(){
         checkPointer(mapPointer);
         nativeApplyStyleUpdate(mapPointer);
     }
