@@ -3,7 +3,6 @@ package com.mapzen.tangram;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
-import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLSurfaceView.Renderer;
 import android.util.DisplayMetrics;
@@ -13,8 +12,11 @@ import com.squareup.okhttp.Callback;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -62,7 +64,6 @@ public class MapController implements Renderer {
         TANGRAM_INFOS,
         DRAW_ALL_LABELS,
         TANGRAM_STATS,
-        SELECTION_BUFFER,
     }
 
     /**
@@ -755,14 +756,6 @@ public class MapController implements Renderer {
         checkPointer(sourcePtr);
         nativeAddGeoJson(mapPointer, sourcePtr, geoJson);
     }
-    public void addStyleUpdate(String styleName,String styleParam,float paramValue){
-        checkPointer(mapPointer);
-        nativeAddStyleUpdate(mapPointer,styleName,styleParam,paramValue);
-    }
-    public void  applyStyleUpdate(){
-        checkPointer(mapPointer);
-        nativeApplyStyleUpdate(mapPointer);
-    }
 
     void checkPointer(long ptr) {
         if (ptr <= 0) {
@@ -809,10 +802,6 @@ public class MapController implements Renderer {
     private synchronized native void nativeMarkerSetStyling(long mapPtr,int markerId, String stylingString);
     private synchronized native void nativeMarkerSetVisible(long mapPtr,int markerId, boolean visible);
     private synchronized native void nativeMarkerRemove(long mapPtr,int markerId);
-
-    //---------Style Updates Methods------
-    private synchronized native void nativeAddStyleUpdate(long mapPtr, String styleName, String styleParam, float paramValue);
-    private synchronized native void nativeApplyStyleUpdate(long mapPtr);
 
     private synchronized native void nativeHandleTapGesture(long mapPtr, float posX, float posY);
     private synchronized native void nativeHandleDoubleTapGesture(long mapPtr, float posX, float posY);
@@ -907,28 +896,123 @@ public class MapController implements Renderer {
     }
 
     boolean startUrlRequest(String url, final long callbackPtr) throws Exception {
-        if (httpHandler == null) {
-            return false;
-        }
-        httpHandler.onRequest(url, new Callback() {
-            @Override
-            public void onFailure(Request request, IOException e) {
-                nativeOnUrlFailure(callbackPtr);
+
+        if(!isOfflineMode()) {
+
+            if (httpHandler == null) {
+                return false;
             }
 
-            @Override
-            public void onResponse(Response response) throws IOException {
-                if (!response.isSuccessful()) {
-                    nativeOnUrlFailure(callbackPtr);
-                    throw new IOException("Unexpected response code: " + response);
-                }
-                BufferedSource source = response.body().source();
-                byte[] bytes = source.readByteArray();
-                nativeOnUrlSuccess(bytes, callbackPtr);
+            // Dont send request if it does not meet criteria
+            if (!TPLHttpRequestManager.shouldRequestToServer(url)) {
+                return false;
             }
-        });
+
+            httpHandler.onRequest(url, new Callback() {
+                @Override
+                public void onFailure(Request request, IOException e) {
+                    nativeOnUrlFailure(callbackPtr);
+                }
+
+                @Override
+                public void onResponse(Response response) throws IOException {
+                    if (!response.isSuccessful()) {
+                        nativeOnUrlFailure(callbackPtr);
+                        throw new IOException("Unexpected response code: " + response);
+                    }
+                    BufferedSource source = response.body().source();
+                    byte[] bytes = source.readByteArray();
+                    nativeOnUrlSuccess(bytes, callbackPtr);
+                }
+            });
+        }
+        else
+        {
+            String localStoragePath = getLocalStorageTilePath(url);
+            if(!new File(localStoragePath).exists())
+                return false;
+
+            byte[] bytes = getOfflineTileInBytes(localStoragePath);
+            tplMapDecryptManager.decryptMapTile(bytes, new TPLMapDecryptManager.MapDecryptCallback() {
+                @Override
+                public void onFailure() {
+                    nativeOnUrlFailure(callbackPtr);
+                }
+
+                @Override
+                public void onResponse(byte[] decryptedMapTileInBytes) {
+                    nativeOnUrlSuccess(decryptedMapTileInBytes, callbackPtr);
+                }
+            });
+        }
+
         return true;
     }
+
+    // Offline Map methods and variables
+    // ==================
+
+    private TPLMapDecryptManager tplMapDecryptManager;
+    private String offlineStoragePath;
+    private boolean isOfflineMode;
+
+    public void configureOfflineMap(String offlineStoragePath, String key) {
+        this.offlineStoragePath = offlineStoragePath;
+        tplMapDecryptManager = new TPLMapDecryptManager(key);
+    }
+
+    private byte[] getOfflineTileInBytes(String path) {
+
+        File file = new File(path);
+        FileInputStream fis = null;
+        byte[] bytes = new byte[(int)file.length()];
+
+        try
+        {
+            fis = new FileInputStream(file);
+            BufferedInputStream buf = new BufferedInputStream(fis);
+            buf.read(bytes, 0, bytes.length);
+            buf.close();
+        } catch (FileNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } finally {
+            try {
+                fis.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return bytes;
+    }
+
+    private String getLocalStorageTilePath(String url) {
+
+        String type = "";
+        if(url.contains("composite"))
+            type = "composite";
+        else if(url.contains("pois"))
+            type = "pois";
+        else if(url.contains("buildings"))
+            type = "buildings";
+
+        return offlineStoragePath + type + "/" + url.split(type + "/")[1];
+    }
+
+    public boolean isOfflineMode() {
+        return isOfflineMode;
+    }
+
+    public void setOfflineMode(boolean offlineMode) {
+        isOfflineMode = offlineMode;
+    }
+
+    // End Offline Map methods and variables
+    ////////////////////////////////////////
+    // ==================
 
     // Font Fetching
     // =============
