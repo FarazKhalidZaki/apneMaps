@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merger version="3"><dataSet config="debug"><source path="/home/faraz/Android Studio Projects/apneMaps/tangram/build/intermediates/bundles/debug/assets"/></dataSet><dataSet config="main"><source path="/home/faraz/Android Studio Projects/apneMaps/tangram/src/androidTest/assets"/></dataSet></merger>
+<merger version="3"><dataSet config="debug"><source path="/home/faraz/AndroidStudioProjects/apneMaps/tangram/build/intermediates/bundles/debug/assets"/></dataSet><dataSet config="main"><source path="/home/faraz/AndroidStudioProjects/apneMaps/tangram/src/androidTest/assets"/></dataSet></merger>

@@ -9,6 +9,7 @@ import android.opengl.GLSurfaceView.Renderer;
 import android.util.DisplayMetrics;
 
 import com.mapzen.tangram.TouchInput.Gestures;
+import com.mapzen.tangram.geometry.Polyline;
 import com.squareup.okhttp.Callback;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
@@ -753,6 +754,32 @@ public class MapController implements Renderer {
         nativeMarkerSetVisible(mapPointer,markerId,visible);
     }
 
+    public LngLat getMarkerPoistion(int markerId){
+        LngLat position = new LngLat();
+        double[] tmp = { 0, 0 };
+        checkPointer(mapPointer);
+        nativeMarkerGetPosition(mapPointer,markerId,tmp);
+        return position.set(tmp[0], tmp[1]);
+    }
+
+    public void removeMarker(int _markerId){
+        checkPointer(mapPointer);
+        nativeMarkerRemove(mapPointer,_markerId);
+    }
+
+    public void createGeometryMapper(Polyline polyline){
+        checkPointer(mapPointer);
+        nativeCreateGeometryMapper(mapPointer,polyline.getCoordinateArray());
+    }
+    public void setGeometryMapperBufferSize(int _size){
+        checkPointer(mapPointer);
+        nativeSetGeometryMapperBufferSize(mapPointer,_size);
+    }
+    public void markerSetPointEasedUsingGeometryMapper(int _markerId,LngLat point,float duration, int easeType){
+        checkPointer(mapPointer);
+        nativeMarkerSetPointEasedUsingGeometryMapper(mapPointer,_markerId,point.longitude,point.latitude,duration,easeType);
+    }
+
 
     void addGeoJson(long sourcePtr, String geoJson) {
         checkPointer(mapPointer);
@@ -813,6 +840,11 @@ public class MapController implements Renderer {
     private synchronized native void nativeMarkerSetStyling(long mapPtr,int markerId, String stylingString);
     private synchronized native void nativeMarkerSetVisible(long mapPtr,int markerId, boolean visible);
     private synchronized native void nativeMarkerRemove(long mapPtr,int markerId);
+    private synchronized native void nativeMarkerGetPosition(long mapPtr, int markerId, double[] lonLatOut);
+    synchronized native void nativeCreateGeometryMapper(long mapPtr, double[] coordinates);
+    private synchronized native void nativeSetGeometryMapperBufferSize(long mapPtr,int size);
+    private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,int markerId, double lon, double lat, float duration, int easeType);
+
 
     //---------Style Updates Methods------
     private synchronized native void nativeAddStyleUpdate(long mapPtr, String styleName, String styleParam, float paramValue);
