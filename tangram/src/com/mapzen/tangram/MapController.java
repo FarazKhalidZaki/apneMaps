@@ -780,6 +780,40 @@ public class MapController implements Renderer {
         nativeMarkerSetPointEasedUsingGeometryMapper(mapPointer,_markerId,point.longitude,point.latitude,duration,easeType);
     }
 
+    public void markerSetRotation(int _markerId, double radians){
+        checkPointer(mapPointer);
+        nativeMarkerSetRotaion(mapPointer,_markerId,radians);
+    }
+
+    public void markerSetRotationEased(int markerId,double radians,float duration, int easeType) {
+        checkPointer(mapPointer);
+        nativeMarkerSetRotaionEased(mapPointer,markerId,radians,duration,easeType);
+    }
+
+    public float markerGetRotation(int _markerId){
+        checkPointer(mapPointer);
+        return nativeMarkerGetRotaion(mapPointer,_markerId);
+    }
+
+    public boolean markerLockWithViewPort(int _markerId,boolean lockPos, boolean lockRot){
+        checkPointer(mapPointer);
+        return nativeMarkerLockWithViewPort(mapPointer,_markerId,lockPos,lockRot);
+    }
+
+    public boolean markerUnlockWithViewPort(int _markerId){
+        checkPointer(mapPointer);
+        return nativeMarkerUnlockWithViewPort(mapPointer,_markerId);
+    }
+
+    public int markerLockedWithViewPort(){
+        checkPointer(mapPointer);
+        return nativeMarkerLockedWithViewPort(mapPointer);
+    }
+
+    public void markerLockingEnable(boolean enable){
+        checkPointer(mapPointer);
+        nativeMarkerLockingEnable(mapPointer,enable);
+    }
 
     void addGeoJson(long sourcePtr, String geoJson) {
         checkPointer(mapPointer);
@@ -837,14 +871,20 @@ public class MapController implements Renderer {
     private synchronized native int nativeAddMarker(long mapPtr);
     private synchronized native void nativeMarkerSetPoint(long mapPtr,int markerId, double lon, double lat);
     private synchronized native void nativeMarkerSetPointEased(long mapPtr,int markerId, double lon, double lat, float duration, int easeType);
+    private synchronized native void nativeMarkerGetPosition(long mapPtr, int markerId, double[] lonLatOut);
+    private synchronized native void nativeMarkerSetRotaion(long mapPtr,int markerId, double radians);
+    private synchronized native void nativeMarkerSetRotaionEased(long mapPtr,int markerId, double radians, float duration, int easeType);
+    private synchronized native float nativeMarkerGetRotaion(long mapPtr, int markerId);
     private synchronized native void nativeMarkerSetStyling(long mapPtr,int markerId, String stylingString);
     private synchronized native void nativeMarkerSetVisible(long mapPtr,int markerId, boolean visible);
     private synchronized native void nativeMarkerRemove(long mapPtr,int markerId);
-    private synchronized native void nativeMarkerGetPosition(long mapPtr, int markerId, double[] lonLatOut);
     synchronized native void nativeCreateGeometryMapper(long mapPtr, double[] coordinates);
     private synchronized native void nativeSetGeometryMapperBufferSize(long mapPtr,int size);
     private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,int markerId, double lon, double lat, float duration, int easeType);
-
+    private synchronized native int nativeMarkerLockedWithViewPort(long mapPtr);
+    private synchronized native boolean nativeMarkerLockWithViewPort(long mapPtr,int markerId, boolean lockPos, boolean lockRot);
+    private synchronized native boolean nativeMarkerUnlockWithViewPort(long mapPtr,int markerId);
+    private synchronized native void nativeMarkerLockingEnable(long mapPtr,boolean enable);
 
     //---------Style Updates Methods------
     private synchronized native void nativeAddStyleUpdate(long mapPtr, String styleName, String styleParam, float paramValue);
