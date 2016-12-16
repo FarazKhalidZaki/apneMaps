@@ -762,6 +762,11 @@ public class MapController implements Renderer {
         return position.set(tmp[0], tmp[1]);
     }
 
+    public int getMarkerLastVisitedIndexOfGeometryMapper(){
+        checkPointer(mapPointer);
+        return nativeMarkerGetLastVisitedIndexOfGeometryMapper(mapPointer);
+    }
+
     public void removeMarker(int _markerId){
         checkPointer(mapPointer);
         nativeMarkerRemove(mapPointer,_markerId);
@@ -879,6 +884,7 @@ public class MapController implements Renderer {
     private synchronized native void nativeMarkerSetVisible(long mapPtr,int markerId, boolean visible);
     private synchronized native void nativeMarkerRemove(long mapPtr,int markerId);
     synchronized native void nativeCreateGeometryMapper(long mapPtr, double[] coordinates);
+    private synchronized native int nativeMarkerGetLastVisitedIndexOfGeometryMapper(long mapPtr);
     private synchronized native void nativeSetGeometryMapperBufferSize(long mapPtr,int size);
     private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,int markerId, double lon, double lat, float duration, int easeType);
     private synchronized native int nativeMarkerLockedWithViewPort(long mapPtr);
