@@ -772,6 +772,11 @@ public class MapController implements Renderer {
         nativeMarkerRemove(mapPointer,_markerId);
     }
 
+    public void rebuildAllMarker(){
+        checkPointer(mapPointer);
+        nativeMarkerRebuildAll(mapPointer);
+    }
+
     public void createGeometryMapper(Polyline polyline){
         checkPointer(mapPointer);
         nativeCreateGeometryMapper(mapPointer,polyline.getCoordinateArray());
@@ -883,7 +888,9 @@ public class MapController implements Renderer {
     private synchronized native void nativeMarkerSetStyling(long mapPtr,int markerId, String stylingString);
     private synchronized native void nativeMarkerSetVisible(long mapPtr,int markerId, boolean visible);
     private synchronized native void nativeMarkerRemove(long mapPtr,int markerId);
+    private synchronized native void nativeMarkerRebuildAll(long mapPtr);
     synchronized native void nativeCreateGeometryMapper(long mapPtr, double[] coordinates);
+    private synchronized native int nativeSetGeometryStickDistance(long mapPtr, double distance);
     private synchronized native int nativeMarkerGetLastVisitedIndexOfGeometryMapper(long mapPtr);
     private synchronized native void nativeSetGeometryMapperBufferSize(long mapPtr,int size);
     private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,int markerId, double lon, double lat, float duration, int easeType);
