@@ -785,9 +785,9 @@ public class MapController implements Renderer {
         checkPointer(mapPointer);
         nativeSetGeometryMapperBufferSize(mapPointer,_size);
     }
-    public void markerSetPointEasedUsingGeometryMapper(int _markerId,LngLat point,float duration, int easeType){
+    public void markerSetPointEasedUsingGeometryMapper(int _markerId,LngLat point,float duration, int easeType,boolean reversed){
         checkPointer(mapPointer);
-        nativeMarkerSetPointEasedUsingGeometryMapper(mapPointer,_markerId,point.longitude,point.latitude,duration,easeType);
+        nativeMarkerSetPointEasedUsingGeometryMapper(mapPointer,_markerId,point.longitude,point.latitude,duration,easeType,reversed);
     }
 
     public void markerSetRotation(int _markerId, double radians){
@@ -893,7 +893,7 @@ public class MapController implements Renderer {
     private synchronized native int nativeSetGeometryStickDistance(long mapPtr, double distance);
     private synchronized native int nativeMarkerGetLastVisitedIndexOfGeometryMapper(long mapPtr);
     private synchronized native void nativeSetGeometryMapperBufferSize(long mapPtr,int size);
-    private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,int markerId, double lon, double lat, float duration, int easeType);
+    private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,int markerId, double lon, double lat, float duration, int easeType, boolean reversed);
     private synchronized native int nativeMarkerLockedWithViewPort(long mapPtr);
     private synchronized native boolean nativeMarkerLockWithViewPort(long mapPtr,int markerId, boolean lockPos, boolean lockRot);
     private synchronized native boolean nativeMarkerUnlockWithViewPort(long mapPtr,int markerId);
