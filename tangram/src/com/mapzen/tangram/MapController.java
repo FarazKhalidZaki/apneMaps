@@ -781,6 +781,11 @@ public class MapController implements Renderer {
         checkPointer(mapPointer);
         nativeCreateGeometryMapper(mapPointer,polyline.getCoordinateArray());
     }
+
+    public void  setGeometryMapperStickDistance(double distance){
+        checkPointer(mapPointer);
+        nativeSetGeometryStickDistance(mapPointer,distance);
+    }
     public void setGeometryMapperBufferSize(int _size){
         checkPointer(mapPointer);
         nativeSetGeometryMapperBufferSize(mapPointer,_size);
