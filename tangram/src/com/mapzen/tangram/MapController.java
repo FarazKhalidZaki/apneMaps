@@ -800,6 +800,11 @@ public class MapController implements Renderer {
         nativeMarkerSetPointEasedUsingGeometryMapperWithBufferIndexes(mapPointer,_markerId,point.longitude,point.latitude, bufferStartIndex,bufferEndIndex,duration,easeType,reversed);
     }
 
+    public double markerDistanceFromEndOfCurrentBufferOfGeometryMapper(){
+        checkPointer(mapPointer);
+        return nativeMarkerDistanceFromEndOfCurrentBufferOfGeometryMapper(mapPointer);
+    }
+
     public void markerSetRotation(int _markerId, double radians){
         checkPointer(mapPointer);
         nativeMarkerSetRotaion(mapPointer,_markerId,radians);
@@ -905,6 +910,7 @@ public class MapController implements Renderer {
     private synchronized native void nativeSetGeometryMapperBufferSize(long mapPtr,int size);
     private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,int markerId, double lon, double lat, float duration, int easeType, boolean reversed);
     private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapperWithBufferIndexes(long mapPtr,int markerId, double lon, double lat, int bufferStartIndex, int bufferEndIndex, float duration, int easeType, boolean reversed);
+    private synchronized native double nativeMarkerDistanceFromEndOfCurrentBufferOfGeometryMapper(long mapPtr);
     private synchronized native int nativeMarkerLockedWithViewPort(long mapPtr);
     private synchronized native boolean nativeMarkerLockWithViewPort(long mapPtr,int markerId, boolean lockPos, boolean lockRot);
     private synchronized native boolean nativeMarkerUnlockWithViewPort(long mapPtr,int markerId);
