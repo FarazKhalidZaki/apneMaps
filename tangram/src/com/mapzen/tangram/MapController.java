@@ -149,8 +149,6 @@ public class MapController implements Renderer {
         view.setRenderer(this);
         view.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 
-        // Set a default HTTPHandler
-        httpHandler = new HttpHandler();
 
         touchInput = new TouchInput(view.getContext());
         view.setOnTouchListener(touchInput);
@@ -226,11 +224,12 @@ public class MapController implements Renderer {
     /**
      * Set the {@link HttpHandler} for retrieving remote map resources; a default-constructed
      * HttpHandler is suitable for most cases, but methods can be extended to modify resource URLs
-     * @param handler the HttpHandler to use
+     * @param mapRequestHandler the HttpHandler to use
      */
-    public void setHttpHandler(HttpHandler handler) {
-        this.httpHandler = handler;
+    public void setMapRequestHandler(MapRequestHandler mapRequestHandler) {
+        this.mapRequestHandler = mapRequestHandler;
     }
+
 
     /**
      * Set the geographic position of the center of the map view
@@ -955,7 +954,7 @@ public class MapController implements Renderer {
     private TouchInput touchInput;
     private FontFileParser fontFileParser;
     private DisplayMetrics displayMetrics = new DisplayMetrics();
-    private HttpHandler httpHandler;
+    private MapRequestHandler mapRequestHandler;
     private FeaturePickListener featurePickListener;
     private ViewCompleteListener viewCompleteListener;
     private FrameCaptureCallback frameCaptureCallback;
@@ -1004,132 +1003,41 @@ public class MapController implements Renderer {
 
     // Networking methods
     // ==================
-
     void cancelUrlRequest(String url) {
-        if (httpHandler == null) {
+        if (mapRequestHandler == null) {
             return;
         }
-        httpHandler.onCancel(url);
+        mapRequestHandler.onCancelMapRequest(url);
     }
 
-    boolean startUrlRequest(String url, final long callbackPtr) throws Exception {
+    boolean startUrlRequestFlag;
+    boolean startUrlRequest(final String url, final long callbackPtr) throws Exception {
 
-        if(!isOfflineMode()) {
+        startUrlRequestFlag = true;
+        if (mapRequestHandler == null) {
+            return false;
+        }
 
-            if (httpHandler == null) {
-                return false;
-            }
 
-            // Dont send request if it does not meet criteria
-            if (!TPLHttpRequestManager.shouldRequestToServer(url)) {
-                return false;
-            }
 
-            httpHandler.onRequest(url, new Callback() {
-                @Override
-                public void onFailure(Request request, IOException e) {
+        mapRequestHandler.onMapRequest(url, new MapRequestHandler.MapRequestCallback() {
+            @Override
+            public void onMapRequestFailure(boolean shouldCallNativeFailure) {
+                if(shouldCallNativeFailure)
                     nativeOnUrlFailure(callbackPtr);
-                }
-
-                @Override
-                public void onResponse(Response response) throws IOException {
-                    if (!response.isSuccessful()) {
-                        nativeOnUrlFailure(callbackPtr);
-                        throw new IOException("Unexpected response code: " + response);
-                    }
-                    BufferedSource source = response.body().source();
-                    byte[] bytes = source.readByteArray();
-                    nativeOnUrlSuccess(bytes, callbackPtr);
-                }
-            });
-        }
-        else
-        {
-            String localStoragePath = getLocalStorageTilePath(url);
-            if(!new File(localStoragePath).exists())
-                return false;
-
-            byte[] bytes = getOfflineTileInBytes(localStoragePath);
-            tplMapDecryptManager.decryptMapTile(bytes, new TPLMapDecryptManager.MapDecryptCallback() {
-                @Override
-                public void onFailure() {
-                    nativeOnUrlFailure(callbackPtr);
-                }
-
-                @Override
-                public void onResponse(byte[] decryptedMapTileInBytes) {
-                    nativeOnUrlSuccess(decryptedMapTileInBytes, callbackPtr);
-                }
-            });
-        }
-
-        return true;
-    }
-
-    // Offline Map methods and variables
-    // ==================
-
-    private TPLMapDecryptManager tplMapDecryptManager;
-    private String offlineStoragePath;
-    private boolean isOfflineMode;
-
-    public void configureOfflineMap(String offlineStoragePath, String key) {
-        this.offlineStoragePath = offlineStoragePath;
-        tplMapDecryptManager = new TPLMapDecryptManager(key);
-    }
-
-    private byte[] getOfflineTileInBytes(String path) {
-
-        File file = new File(path);
-        FileInputStream fis = null;
-        byte[] bytes = new byte[(int)file.length()];
-
-        try
-        {
-            fis = new FileInputStream(file);
-            BufferedInputStream buf = new BufferedInputStream(fis);
-            buf.read(bytes, 0, bytes.length);
-            buf.close();
-        } catch (FileNotFoundException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } finally {
-            try {
-                fis.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+                else
+                    startUrlRequestFlag = false;
             }
-        }
-        return bytes;
+
+            @Override
+            public void onMapRequestSuccess(byte[] bytes) {
+                nativeOnUrlSuccess(bytes, callbackPtr);
+            }
+        });
+        return startUrlRequestFlag;
     }
 
-    private String getLocalStorageTilePath(String url) {
 
-        String type = "";
-        if(url.contains("composite"))
-            type = "composite";
-        else if(url.contains("pois"))
-            type = "pois";
-        else if(url.contains("buildings"))
-            type = "buildings";
-
-        return offlineStoragePath + type + "/" + url.split(type + "/")[1];
-    }
-
-    public boolean isOfflineMode() {
-        return isOfflineMode;
-    }
-
-    public void setOfflineMode(boolean offlineMode) {
-        isOfflineMode = offlineMode;
-    }
-
-    // End Offline Map methods and variables
-    ////////////////////////////////////////
-    // ==================
 
     // Font Fetching
     // =============
