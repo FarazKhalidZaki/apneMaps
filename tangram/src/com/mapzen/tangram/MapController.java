@@ -3,30 +3,30 @@ package com.mapzen.tangram;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.PointF;
-import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLSurfaceView.Renderer;
 import android.util.DisplayMetrics;
 
 import com.mapzen.tangram.TouchInput.Gestures;
 import com.mapzen.tangram.geometry.Polyline;
-import com.squareup.okhttp.Callback;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.Response;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Request;
+import okhttp3.Response;
 import okio.BufferedSource;
 
 /**
@@ -72,15 +72,46 @@ public class MapController implements Renderer {
 
     /**
      * Interface for a callback to receive information about features picked from the map
+     * Triggered after a call of {@link #pickFeature(float, float)}
+     * Listener should be set with {@link #setFeaturePickListener(FeaturePickListener)}
      */
     public interface FeaturePickListener {
         /**
          * Receive information about features found in a call to {@link #pickFeature(float, float)}
          * @param properties A mapping of string keys to string or number values
-         * @param positionX The horizontal screen coordinate of the center of the feature
-         * @param positionY The vertical screen coordinate of the center of the feature
+         * @param positionX The horizontal screen coordinate of the picked location
+         * @param positionY The vertical screen coordinate of the picked location
          */
         void onFeaturePick(Map<String, String> properties, float positionX, float positionY);
+    }
+    /**
+     * Interface for a callback to receive information about labels picked from the map
+     * Triggered after a call of {@link #pickLabel(float, float)}
+     * Listener should be set with {@link #setLabelPickListener(LabelPickListener)}
+     */
+    public interface LabelPickListener {
+        /**
+         * Receive information about labels found in a call to {@link #pickLabel(float, float)}
+         * @param labelPickResult The {@link LabelPickResult} that has been selected
+         * @param positionX The horizontal screen coordinate of the picked location
+         * @param positionY The vertical screen coordinate of the picked location
+         */
+        void onLabelPick(LabelPickResult labelPickResult, float positionX, float positionY);
+    }
+
+    /**
+     * Interface for a callback to receive the picked {@link Marker}
+     * Triggered after a call of {@link #pickMarker(float, float)}
+     * Listener should be set with {@link #setMarkerPickListener(MarkerPickListener)}
+     */
+    public interface MarkerPickListener {
+        /**
+         * Receive information about marker found in a call to {@link #pickMarker(float, float)}
+         * @param markerPickResult The {@link MarkerPickResult} the marker that has been selected
+         * @param positionX The horizontal screen coordinate of the picked location
+         * @param positionY The vertical screen coordinate of the picked location
+         */
+        void onMarkerPick(MarkerPickResult markerPickResult, float positionX, float positionY);
     }
 
     public interface ViewCompleteListener {
@@ -204,6 +235,7 @@ public class MapController implements Renderer {
                 nativeDispose(mapPointer);
                 mapPointer = 0;
                 clientDataSources.clear();
+                markers.clear();
             }
         });
     }
@@ -217,9 +249,20 @@ public class MapController implements Renderer {
      * @param path Location of the YAML scene file within the application assets
      */
     public void loadSceneFile(String path) {
+        loadSceneFile(path, null);
+    }
+
+    /**
+     * Load a new scene file
+     * @param path Location of the YAML scene file within the application assets
+     * @param sceneUpdates List of {@code SceneUpdate}
+     */
+    public void loadSceneFile(String path, List<SceneUpdate> sceneUpdates) {
+
+        String[] updateStrings = bundleSceneUpdates(sceneUpdates);
         scenePath = path;
         checkPointer(mapPointer);
-        nativeLoadScene(mapPointer, path);
+        nativeLoadScene(mapPointer, path, updateStrings);
         requestRender();
     }
 
@@ -639,14 +682,30 @@ public class MapController implements Renderer {
 
     /**
      * Set a listener for feature pick events
-     * @param listener Listener to call
+     * @param listener The {@link FeaturePickListener} to call
      */
     public void setFeaturePickListener(FeaturePickListener listener) {
         featurePickListener = listener;
     }
 
     /**
-     * Query the map for labeled features at the given screen coordinates; results will be returned
+     * Set a listener for label pick events
+     * @param listener The {@link LabelPickListener} to call
+     */
+    public void setLabelPickListener(LabelPickListener listener) {
+        labelPickListener = listener;
+    }
+
+    /**
+     * Set a listener for marker pick events
+     * @param listener The {@link MarkerPickListener} to call
+     */
+    public void setMarkerPickListener(MarkerPickListener listener) {
+        markerPickListener = listener;
+    }
+
+    /**
+     * Query the map for geometry features at the given screen coordinates; results will be returned
      * in a callback to the object set by {@link #setFeaturePickListener(FeaturePickListener)}
      * @param posX The horizontal screen coordinate
      * @param posY The vertical screen coordinate
@@ -656,6 +715,67 @@ public class MapController implements Renderer {
             checkPointer(mapPointer);
             nativePickFeature(mapPointer, posX, posY, featurePickListener);
         }
+    }
+
+    /**
+     * Query the map for labeled features at the given screen coordinates; results will be returned
+     * in a callback to the object set by {@link #setLabelPickListener(LabelPickListener)}
+     * @param posX The horizontal screen coordinate
+     * @param posY The vertical screen coordinate
+     */
+    public void pickLabel(float posX, float posY) {
+        if (labelPickListener != null) {
+            checkPointer(mapPointer);
+            nativePickLabel(mapPointer, posX, posY, labelPickListener);
+        }
+    }
+
+    /**
+     * Query the map for a {@link Marker} at the given screen coordinates; results will be returned
+     * in a callback to the object set by {@link #setMarkerPickListener(MarkerPickListener)}
+     * @param posX The horizontal screen coordinate
+     * @param posY The vertical screen coordinate
+     */
+    public void pickMarker(float posX, float posY) {
+        if (markerPickListener != null) {
+            checkPointer(mapPointer);
+            nativePickMarker(mapPointer, posX, posY, markerPickListener);
+        }
+    }
+
+    /**
+     * Adds a {@link Marker} to the map which can be used to dynamically add points and polylines
+     * to the map.
+     * @return Newly created {@link Marker} object.
+     */
+    public Marker addMarker() {
+        checkPointer(mapPointer);
+        long markerId = nativeMarkerAdd(mapPointer);
+
+        Marker marker = new Marker(mapView.getContext(), markerId, this);
+        markers.put(markerId, marker);
+
+        return marker;
+    }
+
+    /**
+     * Removes the passed in {@link Marker} from the map.
+     * @param marker to remove from the map.
+     * @return whether or not the marker was removed
+     */
+    public boolean removeMarker(Marker marker) {
+        checkPointer(mapPointer);
+        checkId(marker.getMarkerId());
+        markers.remove(marker.getMarkerId());
+        return nativeMarkerRemove(mapPointer, marker.getMarkerId());
+    }
+
+    /**
+     * Remove all the {@link Marker} objects from the map.
+     */
+    public void removeAllMarkers() {
+        checkPointer(mapPointer);
+        nativeMarkerRemoveAll(mapPointer);
     }
 
     /**
@@ -683,12 +803,27 @@ public class MapController implements Renderer {
 
     /**
      * Enqueue a scene component update with its corresponding YAML node value
-     * @param componentPath The YAML component path delimited by a '.' (example "scene.animated")
-     * @param value A YAML valid string (example "{ property: true }" or "true")
+     * @param sceneUpdate A {@code SceneUpdate}
      */
-    public void queueSceneUpdate(String componentPath, String value) {
+    public void queueSceneUpdate(SceneUpdate sceneUpdate) {
         checkPointer(mapPointer);
-        nativeQueueSceneUpdate(mapPointer, componentPath, value);
+        if (sceneUpdate == null) {
+            throw new IllegalArgumentException("sceneUpdate can not be null in queueSceneUpdates");
+        }
+        nativeQueueSceneUpdate(mapPointer, sceneUpdate.getPath(), sceneUpdate.getValue());
+    }
+
+    /**
+     * Enqueue a scene component update with its corresponding YAML node value
+     * @param sceneUpdates List of {@code SceneUpdate}
+     */
+    public void queueSceneUpdate(List<SceneUpdate> sceneUpdates) {
+        checkPointer(mapPointer);
+        if (sceneUpdates == null || sceneUpdates.size() == 0) {
+            throw new IllegalArgumentException("sceneUpdates can not be null or empty in queueSceneUpdates");
+        }
+        String[] updateStrings = bundleSceneUpdates(sceneUpdates);
+        nativeQueueSceneUpdates(mapPointer, updateStrings);
     }
 
     /**
@@ -731,30 +866,94 @@ public class MapController implements Renderer {
         nativeAddFeature(mapPointer, sourcePtr, coordinates, rings, properties);
     }
 
-    public int addMarker() {
+
+    void addGeoJson(long sourcePtr, String geoJson) {
         checkPointer(mapPointer);
-        return nativeAddMarker(mapPointer);
+        checkPointer(sourcePtr);
+        nativeAddGeoJson(mapPointer, sourcePtr, geoJson);
     }
 
-    public void markerSetStyle(int markerId,String stylingSting) {
-        checkPointer(mapPointer);
-        nativeMarkerSetStyling(mapPointer,markerId,stylingSting);
+    void checkPointer(long ptr) {
+        if (ptr <= 0) {
+            throw new RuntimeException("Tried to perform an operation on an invalid pointer! This means you may have used an object that has been disposed and is no longer valid.");
+        }
     }
 
-    public void markerSetPoint(int markerId,double lng,double lat) {
-        checkPointer(mapPointer);
-        nativeMarkerSetPoint(mapPointer,markerId,lng,lat);
-    }
-    public void markerSetPointEased(int markerId,double lng,double lat,float duration, int easeType) {
-        checkPointer(mapPointer);
-        nativeMarkerSetPointEased(mapPointer,markerId,lng,lat,duration,easeType);
-    }
-    public void markerSetVisible(int markerId,boolean visible) {
-        checkPointer(mapPointer);
-        nativeMarkerSetVisible(mapPointer,markerId,visible);
+    void checkId(long id) {
+        if (id <= 0) {
+            throw new RuntimeException("Tried to perform an operation on an invalid id! This means you may have used an object that has been disposed and is no longer valid.");
+        }
     }
 
-    public LngLat getMarkerPoistion(int markerId){
+    private String[] bundleSceneUpdates(List<SceneUpdate> sceneUpdates) {
+
+        String[] updateStrings = null;
+
+        if (sceneUpdates != null) {
+            updateStrings = new String[sceneUpdates.size() * 2];
+            int index = 0;
+            for (SceneUpdate sceneUpdate : sceneUpdates) {
+                updateStrings[index++] = sceneUpdate.getPath();
+                updateStrings[index++] = sceneUpdate.getValue();
+            }
+        }
+
+        return updateStrings;
+    }
+
+    boolean setMarkerStyling(long markerId, String styleStr) {
+        checkPointer(mapPointer);
+        checkId(markerId);
+        return nativeMarkerSetStyling(mapPointer, markerId, styleStr);
+    }
+
+    boolean setMarkerBitmap(long markerId, int width, int height, int[] data) {
+        checkPointer(mapPointer);
+        checkId(markerId);
+        return nativeMarkerSetBitmap(mapPointer, markerId, width, height, data);
+    }
+
+    boolean setMarkerPoint(long markerId, double lng, double lat) {
+        checkPointer(mapPointer);
+        checkId(markerId);
+        return nativeMarkerSetPoint(mapPointer, markerId, lng, lat);
+    }
+
+    boolean setMarkerPointEased(long markerId, double lng, double lat, float duration, EaseType ease) {
+        checkPointer(mapPointer);
+        checkId(markerId);
+        return nativeMarkerSetPointEased(mapPointer, markerId, lng, lat, duration, ease.ordinal());
+    }
+
+    boolean setMarkerPolyline(long markerId, double[] coordinates, int count) {
+        checkPointer(mapPointer);
+        checkId(markerId);
+        return nativeMarkerSetPolyline(mapPointer, markerId, coordinates, count);
+    }
+
+    boolean setMarkerPolygon(long markerId, double[] coordinates, int[] rings, int count) {
+        checkPointer(mapPointer);
+        checkId(markerId);
+        return nativeMarkerSetPolygon(mapPointer, markerId, coordinates, rings, count);
+    }
+
+    boolean setMarkerVisible(long markerId, boolean visible) {
+        checkPointer(mapPointer);
+        checkId(markerId);
+        return nativeMarkerSetVisible(mapPointer, markerId, visible);
+    }
+
+    boolean setMarkerDrawOrder(long markerId, int drawOrder) {
+        checkPointer(mapPointer);
+        checkId(markerId);
+        return nativeMarkerSetDrawOrder(mapPointer, markerId, drawOrder);
+    }
+
+    Marker markerById(long markerId) {
+        return markers.get(markerId);
+    }
+
+    public LngLat getMarkerPoistion(long markerId){
         LngLat position = new LngLat();
         double[] tmp = { 0, 0 };
         checkPointer(mapPointer);
@@ -765,11 +964,6 @@ public class MapController implements Renderer {
     public int getMarkerLastVisitedIndexOfGeometryMapper(){
         checkPointer(mapPointer);
         return nativeMarkerGetLastVisitedIndexOfGeometryMapper(mapPointer);
-    }
-
-    public void removeMarker(int _markerId){
-        checkPointer(mapPointer);
-        nativeMarkerRemove(mapPointer,_markerId);
     }
 
     public void rebuildAllMarker(){
@@ -790,12 +984,12 @@ public class MapController implements Renderer {
         checkPointer(mapPointer);
         nativeSetGeometryMapperBufferSize(mapPointer,_size);
     }
-    public void markerSetPointEasedUsingGeometryMapper(int _markerId,LngLat point,float duration, int easeType,boolean reversed){
+    public void markerSetPointEasedUsingGeometryMapper(long _markerId, LngLat point, float duration, int easeType, boolean reversed){
         checkPointer(mapPointer);
         nativeMarkerSetPointEasedUsingGeometryMapper(mapPointer,_markerId,point.longitude,point.latitude,duration,easeType,reversed);
     }
 
-    public void markerSetPointEasedUsingGeometryMapper(int _markerId,LngLat point, int bufferStartIndex, int bufferEndIndex, float duration, int easeType,boolean reversed){
+    public void markerSetPointEasedUsingGeometryMapper(long _markerId, LngLat point, int bufferStartIndex, int bufferEndIndex, float duration, int easeType, boolean reversed){
         checkPointer(mapPointer);
         nativeMarkerSetPointEasedUsingGeometryMapperWithBufferIndexes(mapPointer,_markerId,point.longitude,point.latitude, bufferStartIndex,bufferEndIndex,duration,easeType,reversed);
     }
@@ -805,27 +999,27 @@ public class MapController implements Renderer {
         return nativeMarkerDistanceFromEndOfCurrentBufferOfGeometryMapper(mapPointer);
     }
 
-    public void markerSetRotation(int _markerId, double radians){
+    public void markerSetRotation(long _markerId, double radians){
         checkPointer(mapPointer);
         nativeMarkerSetRotaion(mapPointer,_markerId,radians);
     }
 
-    public void markerSetRotationEased(int markerId,double radians,float duration, int easeType) {
+    public void markerSetRotationEased(long markerId,double radians,float duration, int easeType) {
         checkPointer(mapPointer);
         nativeMarkerSetRotaionEased(mapPointer,markerId,radians,duration,easeType);
     }
 
-    public float markerGetRotation(int _markerId){
+    public float markerGetRotation(long _markerId){
         checkPointer(mapPointer);
         return nativeMarkerGetRotaion(mapPointer,_markerId);
     }
 
-    public boolean markerLockWithViewPort(int _markerId,boolean lockPos, boolean lockRot){
+    public boolean markerLockWithViewPort(long _markerId,boolean lockPos, boolean lockRot){
         checkPointer(mapPointer);
         return nativeMarkerLockWithViewPort(mapPointer,_markerId,lockPos,lockRot);
     }
 
-    public boolean markerUnlockWithViewPort(int _markerId){
+    public boolean markerUnlockWithViewPort(long _markerId){
         checkPointer(mapPointer);
         return nativeMarkerUnlockWithViewPort(mapPointer,_markerId);
     }
@@ -840,12 +1034,7 @@ public class MapController implements Renderer {
         nativeMarkerLockingEnable(mapPointer,enable);
     }
 
-    void addGeoJson(long sourcePtr, String geoJson) {
-        checkPointer(mapPointer);
-        checkPointer(sourcePtr);
-        nativeAddGeoJson(mapPointer, sourcePtr, geoJson);
-    }
-    public void addStyleUpdate(String styleName,String styleParam,float paramValue){
+    public void addStyleUpdate(String styleName, String styleParam, float paramValue){
         checkPointer(mapPointer);
         nativeAddStyleUpdate(mapPointer,styleName,styleParam,paramValue);
     }
@@ -853,13 +1042,6 @@ public class MapController implements Renderer {
         checkPointer(mapPointer);
         nativeApplyStyleUpdate(mapPointer);
     }
-
-    void checkPointer(long ptr) {
-        if (ptr <= 0) {
-            throw new RuntimeException("Tried to perform an operation on an invalid pointer! This means you may have used an object that has been disposed and is no longer valid.");
-        }
-    }
-
     // Native methods
     // ==============
 
@@ -869,7 +1051,7 @@ public class MapController implements Renderer {
 
     private synchronized native long nativeInit(MapController instance, AssetManager assetManager);
     private synchronized native void nativeDispose(long mapPtr);
-    private synchronized native void nativeLoadScene(long mapPtr, String path);
+    private synchronized native void nativeLoadScene(long mapPtr, String path, String[] updateStrings);
     private synchronized native void nativeSetupGL(long mapPtr);
     private synchronized native void nativeResize(long mapPtr, int width, int height);
     private synchronized native boolean nativeUpdate(long mapPtr, float dt);
@@ -892,33 +1074,12 @@ public class MapController implements Renderer {
     private synchronized native void nativeSetCameraType(long mapPtr, int type);
     private synchronized native int nativeGetCameraType(long mapPtr);
 
-    //------Marker Native Methods--------
-    private synchronized native int nativeAddMarker(long mapPtr);
-    private synchronized native void nativeMarkerSetPoint(long mapPtr,int markerId, double lon, double lat);
-    private synchronized native void nativeMarkerSetPointEased(long mapPtr,int markerId, double lon, double lat, float duration, int easeType);
-    private synchronized native void nativeMarkerGetPosition(long mapPtr, int markerId, double[] lonLatOut);
-    private synchronized native void nativeMarkerSetRotaion(long mapPtr,int markerId, double radians);
-    private synchronized native void nativeMarkerSetRotaionEased(long mapPtr,int markerId, double radians, float duration, int easeType);
-    private synchronized native float nativeMarkerGetRotaion(long mapPtr, int markerId);
-    private synchronized native void nativeMarkerSetStyling(long mapPtr,int markerId, String stylingString);
-    private synchronized native void nativeMarkerSetVisible(long mapPtr,int markerId, boolean visible);
-    private synchronized native void nativeMarkerRemove(long mapPtr,int markerId);
-    private synchronized native void nativeMarkerRebuildAll(long mapPtr);
-    synchronized native void nativeCreateGeometryMapper(long mapPtr, double[] coordinates);
-    private synchronized native int nativeSetGeometryStickDistance(long mapPtr, double distance);
-    private synchronized native int nativeMarkerGetLastVisitedIndexOfGeometryMapper(long mapPtr);
-    private synchronized native void nativeSetGeometryMapperBufferSize(long mapPtr,int size);
-    private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,int markerId, double lon, double lat, float duration, int easeType, boolean reversed);
-    private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapperWithBufferIndexes(long mapPtr,int markerId, double lon, double lat, int bufferStartIndex, int bufferEndIndex, float duration, int easeType, boolean reversed);
-    private synchronized native double nativeMarkerDistanceFromEndOfCurrentBufferOfGeometryMapper(long mapPtr);
-    private synchronized native int nativeMarkerLockedWithViewPort(long mapPtr);
-    private synchronized native boolean nativeMarkerLockWithViewPort(long mapPtr,int markerId, boolean lockPos, boolean lockRot);
-    private synchronized native boolean nativeMarkerUnlockWithViewPort(long mapPtr,int markerId);
-    private synchronized native void nativeMarkerLockingEnable(long mapPtr,boolean enable);
 
-    //---------Style Updates Methods------
-    private synchronized native void nativeAddStyleUpdate(long mapPtr, String styleName, String styleParam, float paramValue);
-    private synchronized native void nativeApplyStyleUpdate(long mapPtr);
+
+
+
+
+
 
     private synchronized native void nativeHandleTapGesture(long mapPtr, float posX, float posY);
     private synchronized native void nativeHandleDoubleTapGesture(long mapPtr, float posX, float posY);
@@ -927,9 +1088,47 @@ public class MapController implements Renderer {
     private synchronized native void nativeHandlePinchGesture(long mapPtr, float posX, float posY, float scale, float velocity);
     private synchronized native void nativeHandleRotateGesture(long mapPtr, float posX, float posY, float rotation);
     private synchronized native void nativeHandleShoveGesture(long mapPtr, float distance);
-    private synchronized native void nativeQueueSceneUpdate(long mapPtr, String componentPath, String value);
+    private synchronized native void nativeQueueSceneUpdate(long mapPtr, String componentPath, String componentValue);
+    private synchronized native void nativeQueueSceneUpdates(long mapPtr, String[] updateStrings);
     private synchronized native void nativeApplySceneUpdates(long mapPtr);
     private synchronized native void nativePickFeature(long mapPtr, float posX, float posY, FeaturePickListener listener);
+    private synchronized native void nativePickLabel(long mapPtr, float posX, float posY, LabelPickListener listener);
+    private synchronized native void nativePickMarker(long mapPtr, float posX, float posY, MarkerPickListener listener);
+
+    //------Marker Native Methods--------
+    private synchronized native long nativeMarkerAdd(long mapPtr);
+    private synchronized native boolean nativeMarkerRemove(long mapPtr, long markerID);
+    private synchronized native boolean nativeMarkerSetStyling(long mapPtr, long markerID, String styling);
+    private synchronized native boolean nativeMarkerSetBitmap(long mapPtr, long markerID, int width, int height, int[] data);
+    private synchronized native boolean nativeMarkerSetPoint(long mapPtr, long markerID, double lng, double lat);
+    private synchronized native boolean nativeMarkerSetPointEased(long mapPtr, long markerID, double lng, double lat, float duration, int ease);
+    private synchronized native boolean nativeMarkerSetPolyline(long mapPtr, long markerID, double[] coordinates, int count);
+    private synchronized native boolean nativeMarkerSetPolygon(long mapPtr, long markerID, double[] coordinates, int[] rings, int count);
+    private synchronized native boolean nativeMarkerSetVisible(long mapPtr, long markerID, boolean visible);
+    private synchronized native boolean nativeMarkerSetDrawOrder(long mapPtr, long markerID, int drawOrder);
+    private synchronized native void nativeMarkerRemoveAll(long mapPtr);
+    private synchronized native void nativeMarkerGetPosition(long mapPtr, long markerId, double[] lonLatOut);
+    private synchronized native void nativeMarkerSetRotaion(long mapPtr,long markerId, double radians);
+    private synchronized native void nativeMarkerSetRotaionEased(long mapPtr,long markerId, double radians, float duration, int easeType);
+    private synchronized native float nativeMarkerGetRotaion(long mapPtr, long markerId);
+    private synchronized native void nativeMarkerRebuildAll(long mapPtr);
+    synchronized native void nativeCreateGeometryMapper(long mapPtr, double[] coordinates);
+    private synchronized native int nativeSetGeometryStickDistance(long mapPtr, double distance);
+    private synchronized native int nativeMarkerGetLastVisitedIndexOfGeometryMapper(long mapPtr);
+    private synchronized native void nativeSetGeometryMapperBufferSize(long mapPtr,int size);
+    private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapper(long mapPtr,long markerId, double lon, double lat, float duration, int easeType, boolean reversed);
+    private synchronized native void nativeMarkerSetPointEasedUsingGeometryMapperWithBufferIndexes(long mapPtr,long markerId, double lon, double lat, int bufferStartIndex, int bufferEndIndex, float duration, int easeType, boolean reversed);
+    private synchronized native double nativeMarkerDistanceFromEndOfCurrentBufferOfGeometryMapper(long mapPtr);
+    private synchronized native int nativeMarkerLockedWithViewPort(long mapPtr);
+    private synchronized native boolean nativeMarkerLockWithViewPort(long mapPtr,long markerId, boolean lockPos, boolean lockRot);
+    private synchronized native boolean nativeMarkerUnlockWithViewPort(long mapPtr,long markerId);
+    private synchronized native void nativeMarkerLockingEnable(long mapPtr,boolean enable);
+
+
+    //---------Style Updates Methods------
+    private synchronized native void nativeAddStyleUpdate(long mapPtr, String styleName, String styleParam, float paramValue);
+    private synchronized native void nativeApplyStyleUpdate(long mapPtr);
+
     private synchronized native void nativeUseCachedGlState(long mapPtr, boolean use);
     private synchronized native void nativeCaptureSnapshot(long mapPtr, int[] buffer);
 
@@ -957,10 +1156,13 @@ public class MapController implements Renderer {
     private DisplayMetrics displayMetrics = new DisplayMetrics();
     private HttpHandler httpHandler;
     private FeaturePickListener featurePickListener;
+    private LabelPickListener labelPickListener;
+    private MarkerPickListener markerPickListener;
     private ViewCompleteListener viewCompleteListener;
     private FrameCaptureCallback frameCaptureCallback;
     private boolean frameCaptureAwaitCompleteView;
     private Map<String, MapData> clientDataSources = new HashMap<>();
+    private Map<Long, Marker> markers = new HashMap<>();
 
     // GLSurfaceView.Renderer methods
     // ==============================
@@ -1027,12 +1229,12 @@ public class MapController implements Renderer {
 
             httpHandler.onRequest(url, new Callback() {
                 @Override
-                public void onFailure(Request request, IOException e) {
+                public void onFailure(Call call, IOException e) {
                     nativeOnUrlFailure(callbackPtr);
                 }
 
                 @Override
-                public void onResponse(Response response) throws IOException {
+                public void onResponse(Call call, Response response) throws IOException {
                     if (!response.isSuccessful()) {
                         nativeOnUrlFailure(callbackPtr);
                         throw new IOException("Unexpected response code: " + response);
